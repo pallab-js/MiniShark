@@ -4,20 +4,38 @@ A lightweight CLI-based network analysis tool similar to tshark, built with Pyth
 
 ## Features
 
+### Core Features
 - **Real-time Packet Capture**: Capture packets from any network interface
-- **Protocol Support**: TCP, UDP, ICMP, DNS, HTTP, and more
-- **BPF Filtering**: Berkeley Packet Filter support for advanced filtering
-- **Multiple Output Formats**: JSON, CSV, and real-time console output
-- **Statistics**: Comprehensive packet statistics and analysis
-- **Cross-platform**: Works on Linux, macOS, and Windows
-- **Lightweight**: Minimal dependencies, runs on any average PC
-- **Color-coded Output**: Easy-to-read colored console output
+- **Offline PCAP Analysis**: Read and analyze pcap/pcapng files
+- **Protocol Support**: TCP, UDP, ICMP, DNS, HTTP, TLS, QUIC, IPv6, ARP, VLAN
+- **BPF Filtering**: Berkeley Packet Filter support with validation
+- **Multiple Output Formats**: JSON, CSV, JSON Lines, PDML
+
+### Advanced Features
+- **TCP Stream Reassembly**: Reassemble and follow TCP streams
+- **Protocol Hierarchy Statistics**: `-z phs` for protocol distribution
+- **Conversation Tracking**: `-z conv` for IP conversations
+- **Field Extraction**: `-T fields -e` for custom column output
+
+### Performance
+- **Multi-threaded Processing**: Fast processing of large capture files
+- **Chunked Reading**: Memory-efficient processing of huge files
+- **Quiet Mode**: `-q` to reduce console overhead
+- **Configurable Buffer Size**: `-B` for kernel buffer tuning
+
+### Protocol Enhancements
+- Human-readable TCP flags (SYN, ACK, FIN, RST, etc.)
+- MAC address extraction
+- VLAN tag parsing
+- HTTP method/URI/host extraction
+- DNS query/response parsing
+- TLS/QUIC port detection
 
 ## Installation
 
 ### Prerequisites
 
-- Python 3.6 or higher
+- Python 3.8 or higher
 - Root/Administrator privileges (for packet capture)
 
 ### Quick Install
@@ -45,7 +63,6 @@ chmod +x minishark.py
 ### Basic Usage
 
 ```bash
-# Capture packets on default interface
 python minishark.py
 
 # Capture on specific interface
@@ -64,71 +81,109 @@ python minishark.py -o capture.json --format json
 ### Command Line Options
 
 ```
-usage: minishark.py [-h] [-i INTERFACE] [-c COUNT] [-f FILTER] [-o OUTPUT]
-                   [--format {json,csv}] [--interfaces] [-v]
+usage: minishark.py [-h] [-i INTERFACE] [-r READ_FILE] [-c COUNT] [-f FILTER]
+                    [-o OUTPUT] [-F {json,csv,jsonlines,pdml}]
+                    [-T {json,csv,fields,pdml}] [-e FIELD] [--interfaces] [-v]
+                    [-z STATISTICS] [-n] [-nn] [-q] [-s SNAPLEN]
+                    [-B BUFFER_SIZE] [--promiscuous] [-w WRITE]
 
-MiniShark - A CLI-based network analysis tool
+MiniShark - A CLI-based network analysis tool similar to tshark
 
 optional arguments:
   -h, --help            show this help message and exit
-  -i INTERFACE, --interface INTERFACE
-                        Network interface to capture on
-  -c COUNT, --count COUNT
-                        Number of packets to capture (0 = unlimited)
-  -f FILTER, --filter FILTER
-                        BPF filter expression
-  -o OUTPUT, --output OUTPUT
-                        Output file to save packets
-  --format {json,csv}   Output format (default: json)
+  -i INTERFACE          Network interface to capture on
+  -r READ_FILE          Read packets from pcap/pcapng file
+  -c COUNT              Number of packets to capture (0 = unlimited)
+  -f FILTER             BPF filter expression
+  -o OUTPUT             Output file to save packets
+  -F {json,csv,jsonlines,pdml}  Output format (default: json)
+  -T {json,csv,fields,pdml}     Output type for -o
+  -e FIELD              Fields to export with -T fields (can be repeated)
   --interfaces          List available network interfaces
   -v, --verbose         Enable verbose logging
+  -z STATISTICS         Show statistics: phs (protocol hierarchy), conv (conversations)
+  -n, --no-name-resolution      Disable name resolution
+  -nn, --no-any-resolution     Disable all name resolution
+  -q, --quiet         Quiet mode - minimal output
+  -s SNAPLEN           Snapshot length (default: 65535)
+  -B BUFFER_SIZE       Kernel buffer size in KB
+  --promiscuous        Put interface in promiscuous mode
+  -w WRITE             Write captured packets to file
 ```
 
 ### Examples
 
 #### 1. Basic Packet Capture
 ```bash
-# Capture all packets on default interface
 python minishark.py
 ```
 
 #### 2. Capture HTTP Traffic
 ```bash
-# Capture only HTTP traffic (port 80)
 python minishark.py -f "tcp port 80"
 ```
 
 #### 3. Capture Specific Host
 ```bash
-# Capture traffic to/from specific IP
 python minishark.py -f "host 192.168.1.100"
 ```
 
 #### 4. Save to File
 ```bash
-# Capture 1000 packets and save to JSON
-python minishark.py -c 1000 -o traffic.json --format json
+python minishark.py -c 1000 -o traffic.json -F json
 
 # Save to CSV format
-python minishark.py -c 500 -o traffic.csv --format csv
+python minishark.py -c 500 -o traffic.csv -F csv
 ```
 
 #### 5. List Available Interfaces
 ```bash
-# Show all available network interfaces
 python minishark.py --interfaces
 ```
 
 #### 6. Advanced Filtering
 ```bash
-# Capture DNS queries
 python minishark.py -f "udp port 53"
-
-# Capture ICMP packets
 python minishark.py -f "icmp"
-
-# Capture traffic between specific subnets
 python minishark.py -f "net 192.168.1.0/24"
+```
+
+#### 7. Offline PCAP Analysis
+```bash
+python minishark.py -r capture.pcap
+python minishark.py -r capture.pcap -c 100
+python minishark.py -r capture.pcap -f "tcp port 80"
+```
+
+#### 8. Protocol Hierarchy Statistics
+```bash
+python minishark.py -r capture.pcap -z phs
+```
+
+#### 9. Conversation Tracking
+```bash
+python minishark.py -r capture.pcap -z conv
+```
+
+#### 10. Field Extraction
+```bash
+python minishark.py -r capture.pcap -T fields -e ip.src -e ip.dst -e tcp.port -e http.request.uri
+python minishark.py -r capture.pcap -T fields -e frame.time -e ip.src -e ip.dst -e protocol -e info
+```
+
+#### 11. JSON Lines Export (for large files)
+```bash
+python minishark.py -r capture.pcap -o output.jsonl -F jsonlines
+```
+
+#### 12. Quiet Mode (for scripting)
+```bash
+python minishark.py -r capture.pcap -q -o output.json
+```
+
+#### 13. Performance Tuning
+```bash
+python minishark.py -r large_capture.pcap -B 4096 -s 65535
 ```
 
 ## Output Format
@@ -159,13 +214,13 @@ python minishark.py -f "net 192.168.1.0/24"
 
 ### Statistics Output
 ```
-================================================== STATISTICS ==================================================
+====================================== STATISTICS ======================================
 Total Packets Captured: 1250
 
-Protocols:
-  TCP: 850
-  UDP: 300
-  ICMP: 100
+Protocols (packets):
+  TCP              850 (68.0%)
+  UDP              300 (24.0%)
+  ICMP             100 ( 8.0%)
 
 Top Source IPs:
   192.168.1.100: 500
@@ -176,6 +231,18 @@ Top Destination IPs:
   8.8.8.8: 300
   142.250.191.14: 200
   192.168.1.1: 150
+```
+
+### Protocol Hierarchy Output
+```
+====================================== PROTOCOL HIERARCHY ================================
+Protocols (packets):
+  TCP              850 (68.0%)
+  UDP              300 (24.0%)
+  ICMP             100 ( 8.0%)
+  TLS              120
+  DNS               80
+  HTTP             150
 ```
 
 ## BPF Filter Examples
@@ -192,11 +259,45 @@ MiniShark supports Berkeley Packet Filter (BPF) syntax for advanced filtering:
 
 ## Requirements
 
-- **Python**: 3.6 or higher
+- **Python**: 3.8 or higher
 - **Operating System**: Linux, macOS, or Windows
 - **Privileges**: Root/Administrator access for packet capture
 - **Memory**: Minimal (typically < 50MB)
 - **CPU**: Low impact, suitable for average PCs
+
+## Quick Reference
+
+### Common Commands
+```bash
+# Basic capture
+python minishark.py -i eth0 -c 100
+
+# Offline analysis with statistics
+python minishark.py -r capture.pcap -z phs,conv,io
+
+# Export with specific format
+python minishark.py -r capture.pcap -o output.json -F json
+python minishark.py -r capture.pcap -o data.parquet -F parquet
+python minishark.py -r capture.pcap -o data.xlsx -F excel
+
+# Security features
+python minishark.py -r capture.pcap --yara rules.yar
+python minishark.py -r capture.pcap --threat
+
+# Forensics
+python minishark.py -r capture.pcap --carve --carve-dir ./carved
+python minishark.py -r capture.pcap --dedup
+
+# Performance tuning
+python minishark.py -r large.pcap --max-memory 512 --packet-buffer-size 50000
+```
+
+### Environment Variables
+| Variable | Description | Default |
+|----------|-------------|---------|
+| MINISHARK_BUFFER_SIZE | Packet buffer size | 10000 |
+| MINISHARK_MAX_MEMORY | Max memory in MB | 1024 |
+| MINISHARK_NO_COLOR | Disable colors | false |
 
 ## Troubleshooting
 
